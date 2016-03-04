@@ -1074,6 +1074,11 @@ def from_filenames(filenames, chunkbytes=None, compression='infer',
                   for fn in full_filenames]
         d = dict(((name, i), task)
                  for i, task in enumerate(toolz.concat(taskss)))
+    elif encoding is None:
+        d = dict(((name, i), (list,
+                              (io.BufferedReader,
+                               (open, fn, 'rb', get_compression(fn)))))
+                 for i, fn in enumerate(full_filenames))
     else:
         d = dict(((name, i), (list,
                               (io.TextIOWrapper,
