@@ -1026,7 +1026,8 @@ def collect(grouper, group, p, barrier_token):
     return list(d.items())
 
 
-def from_filenames(filenames, chunkbytes=None, compression='infer',
+def from_filenames(filenames, load=None,
+                   chunkbytes=None, compression='infer',
                    encoding=system_encoding, linesep=os.linesep):
     """ Create dask by loading in lines from many files
 
@@ -1067,7 +1068,10 @@ def from_filenames(filenames, chunkbytes=None, compression='infer',
             compression = infer_compression(path)
         return compression
 
-    if chunkbytes:
+    if load is not None:
+        d = dict(((name, i), (load, (open, fn, 'rb', get_compression(fn))))
+                 for i, fn in enumerate(full_filenames))
+    elif chunkbytes:
         chunkbytes = int(chunkbytes)
         taskss = [_chunk_read_file(fn, chunkbytes, get_compression(fn),
                                    encoding, linesep)
