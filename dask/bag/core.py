@@ -931,7 +931,7 @@ class Bag(Base):
         return type(self)(merge(self.dask, dsk1, dsk2, dsk3, dsk4), name,
                           npartitions)
 
-    def to_dataframe(self, columns=None):
+    def to_dataframe(self, columns=None, do_optimize=True):
         """ Convert Bag to dask.dataframe
 
         Bag should contain tuple or dict records.
@@ -967,12 +967,14 @@ class Bag(Base):
                 columns = list(range(len(head)))
         name = 'to_dataframe-' + tokenize(self, columns)
         DataFrame = partial(pd.DataFrame, columns=columns)
-        dsk = dict(((name, i), (DataFrame, (list2, (self.name, i))))
+        dsk = optimize(self.dask, self._keys()) if do_optimize \
+            else self.dask.copy()
+        dsk.update(((name, i), (DataFrame, (list2, (self.name, i))))
                    for i in range(self.npartitions))
 
         divisions = [None] * (self.npartitions + 1)
 
-        return dd.DataFrame(merge(optimize(self.dask, self._keys()), dsk),
+        return dd.DataFrame(dsk,
                             name, columns, divisions)
 
     def to_imperative(self):
