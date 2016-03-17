@@ -196,3 +196,44 @@ def assert_dask_graph(dask, label):
     else:
         msg = "given dask graph doesn't contan label: {0}"
         raise AssertionError(msg.format(label))
+
+
+def align_df_categories(df):
+    import dask.dataframe as dd
+    import dask.bag as db
+    shards = db.from_imperative(df.to_imperative())
+    aligned_shards = shards.map_partitions(
+        align_cats, cat_values=all_cat_values(shards)
+    df = dd.from_imperative(aligned_shards, df.columns)
+    return df
+
+
+def all_cat_values(shards):
+    def extract_cat_values(part):
+        return {
+            key: set(part[key].cat.categories)
+            for key in part.dtypes.index[part.dtypes == 'category']}
+
+    def merge_set_dicts(sds):
+        a, bs = sds[0], sds[1:]
+        for b in bs:
+            for key in b:
+                a[key] = a.get(key, set()) | b[key]
+        return a
+
+    if isinstance(shards, dd._Frame):
+        shards = db.from_imperative(shards.to_imperative())
+    assert isinstance(shards, Bag)
+    return shards.reduction(
+        perpartition=extract_cat_values,
+        aggregate=merge_set_dicts,
+        out_type=db.Bag).to_imperative()[0]
+
+
+def align_cats(df, cat_values=None):
+    for key in cat_values:
+        vals = cat_values[key]
+        S = df[key]
+        S.cat.add_categories(vals - set(S.cat.categories), inplace=True)
+        S.cat.reorder_categories(sorted(vals), inplace=True)
+    return df
